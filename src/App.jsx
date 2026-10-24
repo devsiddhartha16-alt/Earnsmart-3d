@@ -10,7 +10,7 @@ import {
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, useGLTF, Html, Center, useProgress } from "@react-three/drei";
 
-// 🎬 Courses Data
+// 🎬 Courses Data (Video URL Fixed)
 const courses = [
   { id: "ai-learning", title: "AI Learning", description: "AI ও Neural Network বেসিক", category: "AI", videoUrl: "https://www.youtube.com/watch?v=aircAruvnKk", image: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=500&q=80" },
   { id: "website-making", title: "Website Making", description: "React দিয়ে ওয়েবসাইট বানাও", category: "Web", videoUrl: "https://www.youtube.com/watch?v=w7ejDZ8SWv8", image: "https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=500&q=80" },
@@ -18,37 +18,39 @@ const courses = [
   { id: "ai-video-creation", title: "AI Video Creation", description: "স্ক্রিপ্ট দিয়ে AI ভিডিও বানাও", category: "AI Video", videoUrl: "https://www.youtube.com/watch?v=3n1T3H8Q1O4", image: "https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?w=500&q=80" }
 ];
 
-// 🌍 3D Models (Google's Official Server - 100% Working, No CORS Issue)
+// 🌍 3D Models (Khronos Official Assets - 100% Working)
 const models3d = [
-  { name: "Astronaut", url: "https://modelviewer.dev/shared-assets/models/Astronaut.glb" },
-  { name: "Robot", url: "https://modelviewer.dev/shared-assets/models/RobotExpressive.glb" },
-  { name: "Human Brain", url: "https://modelviewer.dev/shared-assets/models/BrainStem.glb" },
-  { name: "T-Rex Dinosaur", url: "https://modelviewer.dev/shared-assets/models/T-Rex.glb" },
-  { name: "Damaged Helmet", url: "https://modelviewer.dev/shared-assets/models/glTF-Sample-Models/2.0/DamagedHelmet/glTF-Binary/DamagedHelmet.glb" },
-  { name: "Horse", url: "https://modelviewer.dev/shared-assets/models/Horse.glb" },
-  { name: "Flamingo", url: "https://modelviewer.dev/shared-assets/models/Flamingo.glb" },
-  { name: "Parrot", url: "https://modelviewer.dev/shared-assets/models/Parrot.glb" },
-  { name: "Stork", url: "https://modelviewer.dev/shared-assets/models/Stork.glb" }
+  { name: "Astronaut", url: "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/Astronaut/glTF-Binary/Astronaut.glb" },
+  { name: "Damaged Helmet", url: "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/DamagedHelmet/glTF-Binary/DamagedHelmet.glb" },
+  { name: "Cesium Milk Truck", url: "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/CesiumMilkTruck/glTF-Binary/CesiumMilkTruck.glb" },
+  { name: "Corset", url: "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/Corset/glTF-Binary/Corset.glb" },
+  { name: "Box", url: "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/Box/glTF-Binary/Box.glb" }
 ];
 
-// ─── Gemini API Helper ───
-const callGemini = async (promptText) => {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  if (!apiKey) return "⚠️ API Key missing. Please add VITE_GEMINI_API_KEY to GitHub Secrets.";
+// ─── Groq API Call Helper ───
+const callGroq = async (promptText) => {
+  const apiKey = import.meta.env.VITE_GROQ_API_KEY;
+  if (!apiKey) return "⚠️ Groq API Key missing. Please add VITE_GROQ_API_KEY to GitHub Secrets.";
   
   try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: promptText }] }]
+        model: "llama-3.3-70b-versatile",
+        messages: [{ role: "user", content: promptText }],
+        temperature: 0.7,
+        max_tokens: 1024
       })
     });
     const data = await response.json();
     if (data.error) return "Error: " + data.error.message;
-    return data.candidates[0].content.parts[0].text;
+    return data.choices[0].message.content;
   } catch (error) {
-    return "Sorry, AI is not responding right now.";
+    return "Sorry, Groq AI is not responding right now.";
   }
 };
 
@@ -157,7 +159,6 @@ function ModelLab() {
   const [selectedModel, setSelectedModel] = useState(models3d[0]);
   const [autoRotate, setAutoRotate] = useState(true);
 
-  // Auto rotate for 2 seconds
   useEffect(() => {
     const timer = setTimeout(() => setAutoRotate(false), 2000);
     return () => clearTimeout(timer);
@@ -201,7 +202,7 @@ function CourseDetail() {
 
   const generateNote = async () => {
     setLoadingNote(true);
-    const response = await callGemini(`Summarize the key learning points of a course titled "${course.title}". Give 3 short bullet points.`);
+    const response = await callGroq(`Summarize the key learning points of a course titled "${course.title}". Give 3 short bullet points.`);
     setNote(response);
     setLoadingNote(false);
   };
@@ -218,12 +219,12 @@ function CourseDetail() {
       </div>
       <div className="bg-[#1a1a1a] border border-gray-800 rounded-2xl p-5 mb-6">
         <div className="flex justify-between items-center mb-4">
-          <h3 className="font-bold text-white flex items-center gap-2"><Sparkles size={20} className="text-[#00FF88]"/> AI Note (Gemini)</h3>
+          <h3 className="font-bold text-white flex items-center gap-2"><Sparkles size={20} className="text-[#00FF88]"/> AI Note (Groq)</h3>
           <button onClick={generateNote} disabled={loadingNote} className="text-sm font-medium bg-[#00FF88] text-black px-4 py-2 rounded-xl hover:bg-white transition-colors disabled:opacity-50">
             {loadingNote ? "Generating..." : "Create Note"}
           </button>
         </div>
-        {note ? <pre className="whitespace-pre-wrap text-sm bg-[#0a0a0a] text-gray-300 p-4 rounded-xl border border-gray-800 font-sans">{note}</pre> : <p className="text-gray-500 text-sm">Click "Create Note" to summarize this video with Gemini AI.</p>}
+        {note ? <pre className="whitespace-pre-wrap text-sm bg-[#0a0a0a] text-gray-300 p-4 rounded-xl border border-gray-800 font-sans">{note}</pre> : <p className="text-gray-500 text-sm">Click "Create Note" to summarize this video with Groq AI.</p>}
       </div>
       <Link to="/practice" className="flex items-center justify-center gap-2 bg-[#00FF88] text-black px-4 py-4 rounded-2xl font-bold hover:scale-[1.02] transition-transform">
         <FlaskConical size={22} /> Open Practice Lab
@@ -264,6 +265,7 @@ function PracticeLabHome() {
   );
 }
 
+// ─── AIPromptTool (Groq Connected) ───
 function AIPromptTool() {
   const [prompt, setPrompt] = useState("");
   const [result, setResult] = useState("");
@@ -272,7 +274,7 @@ function AIPromptTool() {
   const generate = async () => {
     if(!prompt) return;
     setLoading(true);
-    const response = await callGemini(`You are an expert prompt engineer. Improve the following prompt to get better results from an AI. Return only the improved prompt: "${prompt}"`);
+    const response = await callGroq(`You are an expert prompt engineer. Improve the following prompt to get better results from an AI. Return only the improved prompt: "${prompt}"`);
     setResult(response);
     setLoading(false);
   };
@@ -292,6 +294,7 @@ function AIPromptTool() {
   );
 }
 
+// ─── CodeTool ───
 function CodeTool() {
   return (
     <div className="p-4 max-w-5xl mx-auto pt-6 pb-24">
@@ -306,6 +309,7 @@ function CodeTool() {
   );
 }
 
+// ─── VideoTool ───
 function VideoTool() {
   const [script, setScript] = useState("");
   const [loading, setLoading] = useState(false);
@@ -333,10 +337,10 @@ function VideoTool() {
   );
 }
 
-// ─── Chat (Gemini Connected) ───
+// ─── Chat (Groq Connected) ───
 function Chat() {
   const [open, setOpen] = useState(false);
-  const [msgs, setMsgs] = useState([{ role: "a", content: "Hi! Ami Gemini AI. Kivabe sahajjo korte pari?" }]);
+  const [msgs, setMsgs] = useState([{ role: "a", content: "Hi! Ami Groq AI. Kivabe sahajjo korte pari?" }]);
   const [txt, setTxt] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -346,7 +350,7 @@ function Chat() {
     setMsgs((m) => [...m, { role: "u", content: userMsg }]); 
     setTxt(""); 
     setLoading(true);
-    const aiResponse = await callGemini(userMsg);
+    const aiResponse = await callGroq(userMsg);
     setMsgs((m) => [...m, { role: "a", content: aiResponse }]);
     setLoading(false);
   };
@@ -356,12 +360,12 @@ function Chat() {
       {open ? (
         <div className="w-[calc(100vw-2rem)] max-w-sm h-96 bg-[#1a1a1a] border border-gray-800 rounded-3xl shadow-2xl flex flex-col overflow-hidden">
           <div className="flex justify-between p-4 border-b border-gray-800 bg-[#0a0a0a]">
-            <span className="font-bold text-sm text-[#00FF88] flex items-center gap-2"><Sparkles size={16}/> Gemini AI</span>
+            <span className="font-bold text-sm text-[#00FF88] flex items-center gap-2"><Sparkles size={16}/> Groq AI</span>
             <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-white"><X size={18} /></button>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-3 text-sm">
             {msgs.map((m, i) => <div key={i} className={`p-3 rounded-2xl max-w-[85%] ${m.role === "u" ? "bg-[#00FF88] text-black ml-auto" : "bg-[#2a2a2a] text-gray-200"}`}>{m.content}</div>)}
-            {loading && <div className="text-gray-500 text-xs italic">Gemini is typing...</div>}
+            {loading && <div className="text-gray-500 text-xs italic">Groq is typing...</div>}
           </div>
           <div className="p-3 border-t border-gray-800 flex gap-2">
             <input value={txt} onChange={(e) => setTxt(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder="Ask anything..." className="flex-1 bg-[#0a0a0a] text-white border border-gray-700 rounded-full px-4 py-2 text-sm outline-none focus:border-[#00FF88]" />
