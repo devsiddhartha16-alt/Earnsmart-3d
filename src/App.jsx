@@ -18,10 +18,10 @@ const courses = [
   { id: "ai-video-creation", title: "AI Video Creation", description: "স্ক্রিপ্ট দিয়ে AI ভিডিও বানাও", category: "AI Video", videoUrl: "https://www.youtube.com/watch?v=3n1T3H8Q1O4", image: "https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?w=500&q=80" }
 ];
 
-// 🌍 3D Models (Google's Official Server - 100% Working)
+// 🌍 3D Models (Google's Official Server - 100% Working, No CORS Issue)
 const models3d = [
   { name: "Astronaut", url: "https://modelviewer.dev/shared-assets/models/Astronaut.glb" },
-  { name: "Robot Expressive", url: "https://modelviewer.dev/shared-assets/models/RobotExpressive.glb" },
+  { name: "Robot", url: "https://modelviewer.dev/shared-assets/models/RobotExpressive.glb" },
   { name: "Human Brain", url: "https://modelviewer.dev/shared-assets/models/BrainStem.glb" },
   { name: "T-Rex Dinosaur", url: "https://modelviewer.dev/shared-assets/models/T-Rex.glb" },
   { name: "Damaged Helmet", url: "https://modelviewer.dev/shared-assets/models/glTF-Sample-Models/2.0/DamagedHelmet/glTF-Binary/DamagedHelmet.glb" },
@@ -30,6 +30,27 @@ const models3d = [
   { name: "Parrot", url: "https://modelviewer.dev/shared-assets/models/Parrot.glb" },
   { name: "Stork", url: "https://modelviewer.dev/shared-assets/models/Stork.glb" }
 ];
+
+// ─── Gemini API Helper ───
+const callGemini = async (promptText) => {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  if (!apiKey) return "⚠️ API Key missing. Please add VITE_GEMINI_API_KEY to GitHub Secrets.";
+  
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: promptText }] }]
+      })
+    });
+    const data = await response.json();
+    if (data.error) return "Error: " + data.error.message;
+    return data.candidates[0].content.parts[0].text;
+  } catch (error) {
+    return "Sorry, AI is not responding right now.";
+  }
+};
 
 // ─── Three Dot Menu ───
 function ThreeDot() {
@@ -77,7 +98,6 @@ function Dashboard() {
         </div>
         <ThreeDot />
       </div>
-
       <div className="grid grid-cols-3 gap-3 mb-8">
         <div className="bg-[#1a1a1a] border border-gray-800 rounded-2xl p-4 flex flex-col items-center">
           <GraduationCap size={24} className="text-[#00FF88] mb-2" />
@@ -95,7 +115,6 @@ function Dashboard() {
           <p className="text-gray-500 text-xs">AI Videos</p>
         </div>
       </div>
-
       <h2 className="text-xl font-bold text-white mb-4">Free Courses</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {courses.map((c) => (
@@ -127,7 +146,7 @@ function Loader3D() {
   return (
     <Html center>
       <div className="flex flex-col items-center justify-center text-white bg-black/50 p-6 rounded-2xl backdrop-blur-md border border-gray-700">
-        <div className="text-xl font-bold mb-2">Loading 3D World...</div>
+        <div className="text-xl font-bold mb-2">Loading 3D...</div>
         <div className="text-4xl font-extrabold text-[#00FF88]">{Math.round(progress)}%</div>
       </div>
     </Html>
@@ -137,17 +156,12 @@ function Loader3D() {
 function ModelLab() {
   const [selectedModel, setSelectedModel] = useState(models3d[0]);
   const [autoRotate, setAutoRotate] = useState(true);
-  const [showSkip, setShowSkip] = useState(false);
 
+  // Auto rotate for 2 seconds
   useEffect(() => {
     const timer = setTimeout(() => setAutoRotate(false), 2000);
     return () => clearTimeout(timer);
   }, [selectedModel]);
-
-  useEffect(() => {
-    const skipTimer = setTimeout(() => setShowSkip(true), 3000);
-    return () => clearTimeout(skipTimer);
-  }, []);
 
   return (
     <div className="p-4 max-w-4xl mx-auto pt-6 pb-24">
@@ -155,14 +169,12 @@ function ModelLab() {
         <h1 className="text-2xl font-bold text-white flex items-center gap-2"><Box className="text-[#00FF88]"/> 3D Lab</h1>
         <ThreeDot />
       </div>
-
       <div className="mb-5 bg-[#1a1a1a] p-4 rounded-2xl border border-gray-800">
         <label className="block text-sm font-semibold text-gray-300 mb-2">Select a Model</label>
-        <select className="w-full p-3 border border-gray-700 rounded-xl bg-[#0a0a0a] text-white font-medium outline-none focus:border-[#00FF88]" value={selectedModel.url} onChange={(e) => setSelectedModel(models3d.find(m => m.url === e.target.value))}>
+        <select className="w-full p-3 border border-gray-700 rounded-xl bg-[#0a0a0a] text-white font-medium outline-none focus:border-[#00FF88]" value={selectedModel.url} onChange={(e) => { setSelectedModel(models3d.find(m => m.url === e.target.value)); setAutoRotate(true); }}>
           {models3d.map((m, i) => <option key={i} value={m.url}>{m.name}</option>)}
         </select>
       </div>
-
       <div className="w-full h-80 md:h-[500px] bg-[#111827] rounded-3xl overflow-hidden relative shadow-2xl border border-gray-800">
         <Canvas camera={{ position: [0, 0, 5], fov: 45 }}>
           <ambientLight intensity={1.5} />
@@ -172,14 +184,6 @@ function ModelLab() {
           </Suspense>
           <OrbitControls autoRotate={autoRotate} enableZoom={true} />
         </Canvas>
-        
-        {showSkip && (
-          <div className="absolute bottom-4 right-4 z-10">
-             <span className="bg-black/60 text-gray-300 text-xs px-3 py-1.5 rounded-full border border-gray-700">
-               Drag to rotate
-             </span>
-          </div>
-        )}
         <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-md text-[#00FF88] text-xs font-bold px-3 py-1.5 rounded-full border border-[#00FF88]/30">
           {selectedModel.name}
         </div>
@@ -193,6 +197,14 @@ function CourseDetail() {
   const { id } = useParams();
   const course = courses.find((c) => c.id === id) || courses[0];
   const [note, setNote] = useState("");
+  const [loadingNote, setLoadingNote] = useState(false);
+
+  const generateNote = async () => {
+    setLoadingNote(true);
+    const response = await callGemini(`Summarize the key learning points of a course titled "${course.title}". Give 3 short bullet points.`);
+    setNote(response);
+    setLoadingNote(false);
+  };
 
   return (
     <div className="p-4 max-w-4xl mx-auto pt-6 pb-24">
@@ -206,10 +218,12 @@ function CourseDetail() {
       </div>
       <div className="bg-[#1a1a1a] border border-gray-800 rounded-2xl p-5 mb-6">
         <div className="flex justify-between items-center mb-4">
-          <h3 className="font-bold text-white flex items-center gap-2"><Sparkles size={20} className="text-[#00FF88]"/> AI Note</h3>
-          <button onClick={() => setNote("📌 Key takeaways:\n1. Introduction\n2. Core concepts")} className="text-sm font-medium bg-[#00FF88] text-black px-4 py-2 rounded-xl hover:bg-white transition-colors">Create Note</button>
+          <h3 className="font-bold text-white flex items-center gap-2"><Sparkles size={20} className="text-[#00FF88]"/> AI Note (Gemini)</h3>
+          <button onClick={generateNote} disabled={loadingNote} className="text-sm font-medium bg-[#00FF88] text-black px-4 py-2 rounded-xl hover:bg-white transition-colors disabled:opacity-50">
+            {loadingNote ? "Generating..." : "Create Note"}
+          </button>
         </div>
-        {note ? <pre className="whitespace-pre-wrap text-sm bg-[#0a0a0a] text-gray-300 p-4 rounded-xl border border-gray-800">{note}</pre> : <p className="text-gray-500 text-sm">Click "Create Note" to summarize this video with AI.</p>}
+        {note ? <pre className="whitespace-pre-wrap text-sm bg-[#0a0a0a] text-gray-300 p-4 rounded-xl border border-gray-800 font-sans">{note}</pre> : <p className="text-gray-500 text-sm">Click "Create Note" to summarize this video with Gemini AI.</p>}
       </div>
       <Link to="/practice" className="flex items-center justify-center gap-2 bg-[#00FF88] text-black px-4 py-4 rounded-2xl font-bold hover:scale-[1.02] transition-transform">
         <FlaskConical size={22} /> Open Practice Lab
@@ -253,14 +267,26 @@ function PracticeLabHome() {
 function AIPromptTool() {
   const [prompt, setPrompt] = useState("");
   const [result, setResult] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const generate = async () => {
+    if(!prompt) return;
+    setLoading(true);
+    const response = await callGemini(`You are an expert prompt engineer. Improve the following prompt to get better results from an AI. Return only the improved prompt: "${prompt}"`);
+    setResult(response);
+    setLoading(false);
+  };
+
   return (
     <div className="p-4 max-w-3xl mx-auto pt-6 pb-24">
       <Link to="/practice" className="text-sm font-medium text-gray-400 hover:text-white flex items-center gap-1 mb-6"><ArrowLeft size={16}/> Back to Lab</Link>
       <div className="bg-[#1a1a1a] border border-gray-800 rounded-3xl p-6 md:p-8">
         <h1 className="text-2xl font-bold text-white mb-6 flex items-center gap-2"><PenTool className="text-[#00FF88]"/> AI Prompt Writer</h1>
         <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Describe what you want to create..." className="w-full bg-[#0a0a0a] text-white border border-gray-700 p-4 rounded-2xl mb-4 h-40 text-sm outline-none focus:border-[#00FF88]" />
-        <button onClick={() => setResult("Optimized Prompt: [AI generated response]")} className="bg-[#00FF88] text-black font-bold px-8 py-3 rounded-xl hover:bg-white transition-colors">Generate Prompt</button>
-        {result && <div className="mt-8 bg-[#0a0a0a] border border-gray-700 p-5 rounded-2xl text-sm text-gray-300">{result}</div>}
+        <button onClick={generate} disabled={loading} className="bg-[#00FF88] text-black font-bold px-8 py-3 rounded-xl hover:bg-white transition-colors disabled:opacity-50">
+          {loading ? "Generating..." : "Improve Prompt"}
+        </button>
+        {result && <div className="mt-8 bg-[#0a0a0a] border border-gray-700 p-5 rounded-2xl text-sm text-gray-300 whitespace-pre-wrap">{result}</div>}
       </div>
     </div>
   );
@@ -273,7 +299,7 @@ function CodeTool() {
       <div className="bg-[#1a1a1a] border border-gray-800 rounded-3xl p-6">
         <h1 className="text-2xl font-bold text-white mb-6 flex items-center gap-2"><Code className="text-[#00FF88]"/> Live Code Editor</h1>
         <div className="rounded-2xl overflow-hidden border border-gray-700 h-[500px]">
-          <Sandpack template="react" theme="dark" options={{ showNavigator: false, editorHeight: 500 }} files={{ "/App.js": `export default function App() {\n  return (\n    <div style={{ padding: 20, textAlign: 'center', color: 'white' }}>\n      <h1 style={{ color: '#00FF88' }}>Hello Earnsmart!</h1>\n    </div>\n  );\n}` }} />
+          <Sandpack template="react" theme="dark" options={{ showNavigator: false, editorHeight: 500 }} files={{ "/App.js": `export default function App() {\n  return (\n    <div style={{ padding: 20, textAlign: 'center', color: 'white' }}>\n      <h1 style={{ color: '#00FF88' }}>Hello Earnsmart!</h1>\n      <p>Write your code here.</p>\n    </div>\n  );\n}` }} />
         </div>
       </div>
     </div>
@@ -307,25 +333,39 @@ function VideoTool() {
   );
 }
 
+// ─── Chat (Gemini Connected) ───
 function Chat() {
   const [open, setOpen] = useState(false);
-  const [msgs, setMsgs] = useState([{ role: "a", content: "Hi! Ami Earnsmart AI. Kivabe sahajjo korte pari?" }]);
+  const [msgs, setMsgs] = useState([{ role: "a", content: "Hi! Ami Gemini AI. Kivabe sahajjo korte pari?" }]);
   const [txt, setTxt] = useState("");
-  const send = () => { if (!txt.trim()) return; setMsgs((m) => [...m, { role: "u", content: txt }, { role: "a", content: "Ami demo AI." }]); setTxt(""); };
+  const [loading, setLoading] = useState(false);
+
+  const send = async () => { 
+    if (!txt.trim()) return; 
+    const userMsg = txt;
+    setMsgs((m) => [...m, { role: "u", content: userMsg }]); 
+    setTxt(""); 
+    setLoading(true);
+    const aiResponse = await callGemini(userMsg);
+    setMsgs((m) => [...m, { role: "a", content: aiResponse }]);
+    setLoading(false);
+  };
+
   return (
     <div className="fixed bottom-24 right-4 z-50">
       {open ? (
         <div className="w-[calc(100vw-2rem)] max-w-sm h-96 bg-[#1a1a1a] border border-gray-800 rounded-3xl shadow-2xl flex flex-col overflow-hidden">
           <div className="flex justify-between p-4 border-b border-gray-800 bg-[#0a0a0a]">
-            <span className="font-bold text-sm text-[#00FF88] flex items-center gap-2"><Sparkles size={16}/> AI Tutor</span>
+            <span className="font-bold text-sm text-[#00FF88] flex items-center gap-2"><Sparkles size={16}/> Gemini AI</span>
             <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-white"><X size={18} /></button>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-3 text-sm">
             {msgs.map((m, i) => <div key={i} className={`p-3 rounded-2xl max-w-[85%] ${m.role === "u" ? "bg-[#00FF88] text-black ml-auto" : "bg-[#2a2a2a] text-gray-200"}`}>{m.content}</div>)}
+            {loading && <div className="text-gray-500 text-xs italic">Gemini is typing...</div>}
           </div>
           <div className="p-3 border-t border-gray-800 flex gap-2">
             <input value={txt} onChange={(e) => setTxt(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder="Ask anything..." className="flex-1 bg-[#0a0a0a] text-white border border-gray-700 rounded-full px-4 py-2 text-sm outline-none focus:border-[#00FF88]" />
-            <button onClick={send} className="bg-[#00FF88] text-black p-2.5 rounded-full"><Send size={16} /></button>
+            <button onClick={send} disabled={loading} className="bg-[#00FF88] text-black p-2.5 rounded-full disabled:opacity-50"><Send size={16} /></button>
           </div>
         </div>
       ) : (
