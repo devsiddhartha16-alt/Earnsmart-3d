@@ -3,5 +3,5 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  base: '/earnsmart-3d/',
+  base: '/Earnsmart-3d/',
 })
